@@ -5,6 +5,20 @@ en **Calendar Resource Management**. Permite consultar la agenda, buscar
 horarios libres, crear y gestionar reservas y distinguir las reservas hechas
 para una persona desde las hechas por otra.
 
+## Capturas
+
+### Calendario
+
+![Calendario mensual de Reservas](./docs/screenshots/calendario.png)
+
+### Nueva reserva
+
+![Formulario para crear una nueva reserva](./docs/screenshots/nueva-reserva.png)
+
+### Buscar espacios libres
+
+![Resultados de espacios disponibles](./docs/screenshots/espacios-libres.png)
+
 ## Requisitos
 
 - Nextcloud 34 y PHP 8.3–8.5.
