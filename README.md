@@ -11,6 +11,14 @@ para una persona desde las hechas por otra.
 
 ![Calendario mensual de Reservas](./docs/screenshots/calendario.png)
 
+### Vista semanal
+
+![Calendario semanal de Reservas](./docs/screenshots/calendario-semanal.png)
+
+### Vista diaria
+
+![Calendario diario de Reservas](./docs/screenshots/calendario-diario.png)
+
 ### Nueva reserva
 
 ![Formulario para crear una nueva reserva](./docs/screenshots/nueva-reserva.png)
@@ -18,6 +26,10 @@ para una persona desde las hechas por otra.
 ### Buscar espacios libres
 
 ![Resultados de espacios disponibles](./docs/screenshots/espacios-libres.png)
+
+### Configuración de grupos
+
+![Selección de grupos con permisos para crear eventos recurrentes](./docs/screenshots/administracion-grupos.png)
 
 ## Requisitos
 
