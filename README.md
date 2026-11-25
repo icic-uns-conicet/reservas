@@ -21,7 +21,7 @@ para una persona desde las hechas por otra.
 
 ## Requisitos
 
-- Nextcloud 34 y PHP 8.3–8.5.
+- Nextcloud 34–35 y PHP 8.3–8.6.
 - Las aplicaciones **Calendar** y **Calendar Resource Management** activadas.
 - Salas creadas en Calendar Resource Management.
 - La cuenta de cada persona debe tener un correo electrónico válido en su perfil
