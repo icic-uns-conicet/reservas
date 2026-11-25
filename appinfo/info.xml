@@ -1,0 +1,35 @@
+<?xml version="1.0"?>
+
+<info xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:noNamespaceSchemaLocation="https://apps.nextcloud.com/schema/apps/info.xsd">
+
+    <id>reservas</id>
+
+    <name>Reservas</name>
+
+    <summary>Coordinación de espacios físicos con Nextcloud Calendar</summary>
+
+    <description>
+        Permite reservar salas configuradas en Calendar Resource Management,
+        evita reservas solapadas y muestra quién reservó cada espacio y para qué materia.
+    </description>
+
+    <version>0.1.0</version>
+
+    <licence>AGPL-3.0-or-later</licence>
+
+    <author>Kcho</author>
+
+    <namespace>Reservas</namespace>
+
+    <category>organization</category>
+
+    <bugs>https://github.com/tu-organizacion/reservas/issues</bugs>
+
+    <dependencies>
+        <php min-version="8.3" max-version="8.5" />
+        <app id="calendar_resource_management" min-version="1.0.0" />
+        <nextcloud min-version="34" max-version="34"/>
+    </dependencies>
+
+</info>

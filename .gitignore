@@ -1,0 +1,21 @@
+# Dependencias
+node_modules/
+
+# Archivos temporales
+*.log
+*.tmp
+.DS_Store
+
+# Archivos de desarrollo
+.vscode/
+.idea/
+
+# Configuraciones locales
+.env
+.env.local
+.env.*.local
+
+# Archivos de respaldo
+*.bak
+*.backup
+*~
