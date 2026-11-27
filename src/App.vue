@@ -88,21 +88,25 @@
                 <p class="availability-context">
                     Espacios seleccionados · período visible del calendario · 08:00–20:00
                 </p>
-                <label class="availability-duration">
-                    Duración
-                    <select
+                <label class="availability-duration duration-control">
+                    <span class="duration-heading">
+                        Duración
+                        <output>{{ formatDuration(availabilityDuration) }}</output>
+                    </span>
+                    <input
                         v-model.number="availabilityDuration"
+                        type="range"
+                        min="30"
+                        max="480"
+                        step="30"
                         :disabled="availabilityLoading"
+                        aria-label="Duración de la reserva"
                         @change="updateAvailabilityDuration"
                     >
-                        <option
-                            v-for="duration in durationOptions"
-                            :key="duration.minutes"
-                            :value="duration.minutes"
-                        >
-                            {{ duration.label }}
-                        </option>
-                    </select>
+                    <span class="duration-limits" aria-hidden="true">
+                        <span>30 min</span>
+                        <span>8 h</span>
+                    </span>
                 </label>
                 <p v-if="availabilityLoading" class="availability-message" role="status">
                     Buscando horarios libres…
@@ -334,7 +338,26 @@
                                 required
                             >
                         </label>
-                            <label v-if="!reservation.allDay">
+                        <label v-if="!reservation.allDay && !editingReservation" class="duration-control">
+                            <span class="duration-heading">
+                                Duración
+                                <output>{{ formatDuration(reservation.durationMinutes) }}</output>
+                            </span>
+                            <input
+                                v-model.number="reservation.durationMinutes"
+                                type="range"
+                                min="30"
+                                max="480"
+                                step="30"
+                                required
+                                aria-label="Duración de la reserva"
+                            >
+                            <span class="duration-limits" aria-hidden="true">
+                                <span>30 min</span>
+                                <span>8 h</span>
+                            </span>
+                        </label>
+                        <label v-else-if="!reservation.allDay">
                             Duración
                             <select v-model.number="reservation.durationMinutes" required>
                                 <option
@@ -569,6 +592,28 @@ const durationOptions = [
     { minutes: 450, label: '7.5h' },
     { minutes: 480, label: '8h' },
 ]
+const savedDuration = Number(localStorage.getItem('reservas-last-duration-minutes'))
+const lastReservationDuration = ref(
+    isValidDuration(savedDuration) ? savedDuration : 60,
+)
+
+function isValidDuration(minutes) {
+    return durationOptions.some((duration) => duration.minutes === minutes)
+}
+
+function normalizeDuration(minutes) {
+    return durationOptions.reduce((closest, duration) => (
+        Math.abs(duration.minutes - minutes) < Math.abs(closest - minutes)
+            ? duration.minutes
+            : closest
+    ), durationOptions[0].minutes)
+}
+
+function formatDuration(minutes) {
+    return durationOptions.find((duration) => duration.minutes === minutes)?.label
+        ?? `${minutes} min`
+}
+
 const weekdays = ['L', 'M', 'X', 'J', 'V', 'S', 'D']
 const views = [
     { id: 'dayGridMonth', label: 'Mes' },
@@ -703,7 +748,7 @@ function toggleRoomFilter(roomKey) {
 
 async function openAvailabilitySearch() {
     availabilityOpen.value = true
-    availabilityDuration.value = 60
+    availabilityDuration.value = lastReservationDuration.value
     availabilityError.value = ''
     availabilityEvents.value = []
     availabilityResults.value = []
@@ -890,9 +935,10 @@ function openReservationForSelection(date, endDate = null) {
     } else if (endDate === null) {
         time.setMinutes(Math.ceil(time.getMinutes() / 30) * 30, 0, 0)
     }
-    const durationMinutes = endDate === null
-        ? 60
+    const selectedDurationMinutes = endDate === null
+        ? lastReservationDuration.value
         : Math.round((new Date(endDate).getTime() - selectedDate.getTime()) / 60000)
+    const durationMinutes = normalizeDuration(selectedDurationMinutes)
 
     const dateValue = toLocalDateValue(selectedDate)
     const rememberedEndDate = lastContinuousEndDate.value
@@ -1040,6 +1086,9 @@ async function submitReservation() {
             })
         } else {
             await createReservation(reservationData)
+            if (!reservation.value.allDay) {
+                rememberReservationDuration(reservation.value.durationMinutes)
+            }
         }
         reservationOpen.value = false
         editingReservation.value = null
@@ -1051,6 +1100,19 @@ async function submitReservation() {
             : 'No se pudo completar la reserva.')
     } finally {
         savingReservation.value = false
+    }
+}
+
+function rememberReservationDuration(minutes) {
+    if (!isValidDuration(minutes)) {
+        return
+    }
+
+    lastReservationDuration.value = minutes
+    try {
+        localStorage.setItem('reservas-last-duration-minutes', String(minutes))
+    } catch (error) {
+        console.error('No se pudo guardar la duración preferida de la reserva.', error)
     }
 }
 
@@ -1517,6 +1579,36 @@ onUnmounted(() => {
     color: var(--calendar-text);
     background: #fff;
     font: inherit;
+    font-weight: 400;
+}
+
+.reservation-modal input[type="range"] {
+    min-height: 0;
+    padding: 0;
+    border: 0;
+    accent-color: var(--calendar-blue);
+}
+
+.duration-control {
+    grid-column: 1 / -1;
+}
+
+.duration-heading,
+.duration-limits {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.duration-heading output {
+    color: var(--calendar-blue);
+    font-size: 15px;
+    font-weight: 600;
+}
+
+.duration-limits {
+    color: var(--calendar-muted);
+    font-size: 11px;
     font-weight: 400;
 }
 
