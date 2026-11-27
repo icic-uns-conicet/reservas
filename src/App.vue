@@ -86,7 +86,7 @@
                 >×</button>
                 <h2 id="availability-title">{{ availabilityTitle }}</h2>
                 <p class="availability-context">
-                    Espacios seleccionados · período visible del calendario · 08:00–20:00
+                    {{ availabilityContext }}
                 </p>
                 <label class="availability-duration duration-control">
                     <span class="duration-heading">
@@ -122,39 +122,50 @@
                     No se encontraron horarios libres con esa duración en el período visible.
                 </p>
                 <div v-else class="availability-results">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th v-if="selectedRoomKeys.length > 1">Espacio</th>
-                                <th>Día</th>
-                                <th>Hora</th>
-                                <th>Acción</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr
-                                v-for="slot in availabilityResults.slice(0, availabilityVisibleCount)"
-                                :key="slot.key"
-                                :class="{ 'availability-room-colored': selectedRoomKeys.length > 1 }"
-                                :style="selectedRoomKeys.length > 1
-                                    ? { '--availability-room-color': slot.roomColor }
-                                    : undefined"
+                    <div class="availability-room-grid">
+                        <article
+                            v-for="room in availabilityRoomGroups"
+                            :key="room.key"
+                            class="availability-room-card"
+                            :style="{ '--availability-room-color': room.color }"
+                        >
+                            <h3 class="availability-room-title">
+                                <span aria-hidden="true"></span>
+                                {{ room.name }}
+                            </h3>
+                            <p class="availability-room-label">Horarios disponibles:</p>
+                            <div
+                                v-for="day in room.days"
+                                :key="day.key"
+                                class="availability-day-group"
                             >
-                                <td v-if="selectedRoomKeys.length > 1">{{ slot.roomName }}</td>
-                                <td>{{ formatAvailabilityDate(slot.start) }}</td>
-                                <td>{{ formatAvailabilityTime(slot.start) }}</td>
-                                <td>
+                                <h4 v-if="availabilityHasMultipleDates">
+                                    {{ formatAvailabilityDate(day.date) }}
+                                </h4>
+                                <div class="availability-time-slots">
                                     <button
-                                        class="reserve-button availability-reserve-button"
+                                        v-for="slot in day.slots"
+                                        :key="slot.key"
+                                        class="availability-time-button"
+                                        :class="{ selected: selectedAvailabilitySlotKey === slot.key }"
                                         type="button"
-                                        @click="reserveAvailableSlot(slot)"
+                                        :aria-pressed="selectedAvailabilitySlotKey === slot.key"
+                                        @click="selectAvailabilitySlot(slot)"
                                     >
-                                        Reservar
+                                        {{ formatAvailabilityTime(slot.start) }}
                                     </button>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
+                                </div>
+                            </div>
+                            <button
+                                class="reserve-button availability-room-book-button"
+                                type="button"
+                                :disabled="!getSelectedAvailabilitySlot(room.key)"
+                                @click="reserveAvailableSlot(getSelectedAvailabilitySlot(room.key))"
+                            >
+                                Reservar en {{ room.name }}
+                            </button>
+                        </article>
+                    </div>
                     <button
                         v-if="availabilityVisibleCount < availabilityResults.length"
                         class="secondary-button availability-more-button"
@@ -554,6 +565,7 @@ const availabilityError = ref('')
 const availabilityEvents = ref([])
 const availabilityResults = ref([])
 const availabilityVisibleCount = ref(50)
+const selectedAvailabilitySlotKey = ref('')
 const reservationOpen = ref(false)
 const savingReservation = ref(false)
 const reservationError = ref('')
@@ -626,15 +638,55 @@ const miniMonthTitle = computed(() => new Intl.DateTimeFormat('es', {
     year: 'numeric',
 }).format(selectedDate.value))
 
-const availabilityTitle = computed(() => {
-    if (selectedRoomKeys.value.length !== 1) {
-        return 'Buscar espacio libre'
+const availabilityTitle = computed(() => 'Buscar espacio libre')
+
+const availabilityContext = computed(() => {
+    const { start, end } = visibleCalendarRange.value
+    if (!start || !end) {
+        return 'Espacios seleccionados · 08:00–20:00'
     }
 
-    const selectedRoom = rooms.value.find((room) => room.key === selectedRoomKeys.value[0])
-    return selectedRoom
-        ? `Buscar espacio libre en ${selectedRoom.displayName}`
-        : 'Buscar espacio libre'
+    const lastDate = new Date(end.getTime() - 1)
+    const startLabel = formatAvailabilityDate(start)
+    const dateRange = toLocalDateValue(start) === toLocalDateValue(lastDate)
+        ? startLabel
+        : `${startLabel}–${formatAvailabilityDate(lastDate)}`
+
+    return `Espacios seleccionados · ${dateRange} · 08:00–20:00`
+})
+
+const availabilityHasMultipleDates = computed(() => {
+    const { start, end } = visibleCalendarRange.value
+    return Boolean(start && end
+        && toLocalDateValue(start) !== toLocalDateValue(new Date(end.getTime() - 1)))
+})
+
+const availabilityRoomGroups = computed(() => {
+    const groups = new Map()
+    const visibleSlots = availabilityResults.value.slice(0, availabilityVisibleCount.value)
+
+    for (const slot of visibleSlots) {
+        let room = groups.get(slot.roomKey)
+        if (!room) {
+            room = {
+                key: slot.roomKey,
+                name: slot.roomName,
+                color: slot.roomColor,
+                days: [],
+            }
+            groups.set(slot.roomKey, room)
+        }
+
+        const dayKey = toLocalDateValue(slot.start)
+        let day = room.days.find((item) => item.key === dayKey)
+        if (!day) {
+            day = { key: dayKey, date: slot.start, slots: [] }
+            room.days.push(day)
+        }
+        day.slots.push(slot)
+    }
+
+    return [...groups.values()].sort((left, right) => left.name.localeCompare(right.name, 'es'))
 })
 
 const miniMonthDays = computed(() => {
@@ -753,6 +805,7 @@ async function openAvailabilitySearch() {
     availabilityEvents.value = []
     availabilityResults.value = []
     availabilityVisibleCount.value = 50
+    selectedAvailabilitySlotKey.value = ''
 
     if (selectedRoomKeys.value.length === 0) {
         availabilityError.value = 'Selecciona al menos un espacio reservable.'
@@ -784,6 +837,7 @@ function closeAvailabilitySearch() {
 
 function updateAvailabilityDuration() {
     availabilityVisibleCount.value = 50
+    selectedAvailabilitySlotKey.value = ''
     calculateAvailableSlots()
 }
 
@@ -890,6 +944,15 @@ function reserveAvailableSlot(slot) {
     openReservationForSelection(slot.start)
     reservation.value.roomKey = slot.roomKey
     reservation.value.durationMinutes = availabilityDuration.value
+}
+
+function selectAvailabilitySlot(slot) {
+    selectedAvailabilitySlotKey.value = slot.key
+}
+
+function getSelectedAvailabilitySlot(roomKey) {
+    return availabilityResults.value.find((slot) =>
+        slot.key === selectedAvailabilitySlotKey.value && slot.roomKey === roomKey)
 }
 
 function formatAvailabilityDate(date) {
@@ -1458,7 +1521,13 @@ onUnmounted(() => {
 }
 
 .availability-modal {
-    width: min(100%, 760px);
+    width: min(100%, 520px);
+    padding: 22px;
+}
+
+.availability-modal h2 {
+    margin-bottom: 12px;
+    font-size: 20px;
 }
 
 .reservation-modal h2 {
@@ -1501,57 +1570,109 @@ onUnmounted(() => {
 
 .availability-context,
 .availability-message {
-    margin: -8px 0 18px;
+    margin: 0 0 14px;
     color: var(--calendar-muted);
     font-size: 13px;
     line-height: 1.5;
 }
 
 .availability-results {
-    max-height: min(52vh, 500px);
+    max-height: min(52vh, 420px);
     overflow: auto;
-    border: 1px solid var(--calendar-border);
-    border-radius: 8px;
 }
 
-.availability-results table {
-    width: 100%;
-    min-width: 500px;
-    border-collapse: collapse;
+.availability-room-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: stretch;
+    gap: 8px;
+}
+
+.availability-room-card {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px;
+    border: 1px solid var(--calendar-border);
+    border-top: 3px solid var(--availability-room-color);
+    border-radius: 7px;
+    background: #fff;
+}
+
+.availability-room-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    color: var(--calendar-text);
+    font-size: 17px;
+}
+
+.availability-room-title span {
+    width: 14px;
+    height: 14px;
+    flex: 0 0 14px;
+    border-radius: 50%;
+    background: var(--availability-room-color);
+}
+
+.availability-room-label {
+    margin: 0;
+    color: var(--calendar-text);
     font-size: 13px;
 }
 
-.availability-results th,
-.availability-results td {
-    padding: 9px 12px;
-    border-bottom: 1px solid var(--calendar-border);
-    text-align: left;
+.availability-day-group + .availability-day-group {
+    margin-top: 5px;
 }
 
-.availability-results th {
-    position: sticky;
-    top: 0;
+.availability-day-group h4 {
+    margin: 0 0 5px;
     color: var(--calendar-muted);
-    background: #fff;
+    font-size: 12px;
     font-weight: 600;
 }
 
-.availability-results th:last-child,
-.availability-results td:last-child {
-    text-align: right;
+.availability-time-slots {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 5px;
 }
 
-.availability-results .availability-room-colored {
-    background-color: color-mix(in srgb, var(--availability-room-color) 12%, #fff);
-}
-
-.availability-results tbody tr:last-child td {
-    border-bottom: 0;
-}
-
-.availability-reserve-button {
+.availability-time-button {
+    min-width: 0;
     min-height: 32px;
-    padding: 0 12px;
+    padding: 0 5px;
+    border: 1px solid #d2e3fc;
+    border-radius: 6px;
+    color: #174ea6;
+    background: #e8f0fe;
+    cursor: pointer;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.availability-time-button:hover {
+    background: #d3e3fd;
+}
+
+.availability-time-button.selected {
+    border-color: var(--calendar-blue);
+    color: #fff;
+    background: var(--calendar-blue);
+}
+
+.availability-room-book-button {
+    width: 100%;
+    margin-top: auto;
+    white-space: normal;
+}
+
+.availability-room-book-button:disabled {
+    cursor: not-allowed;
+    opacity: .6;
 }
 
 .availability-more-button {
@@ -2065,6 +2186,12 @@ onUnmounted(() => {
     }
 
     .date-fields {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 480px) {
+    .availability-room-grid {
         grid-template-columns: 1fr;
     }
 }
